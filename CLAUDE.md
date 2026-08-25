@@ -33,10 +33,19 @@ auditable and editable.
 - Prompt templates are separate, readable files — this is a PM tool, the PRD structure itself
   is the product decision.
 
+## Tradeoffs (required — do not skip)
+Change at least one of these from whatever an AI would default to, and document why in a
+`## Tradeoffs` section in the README:
+- Your PRD section structure vs. a generic template — what you added, removed, or reordered
+  for your context, and why.
+- The threshold for when to ask a clarifying question vs. proceed with a stated assumption.
+- How many clarifying questions is too many (you capped it — why that number).
+
 ## Definition of done
 - [ ] Runs end-to-end on 3 different sample inputs (vague, medium, detailed) with outputs in README
 - [ ] README explains the PRD structure choices (why these sections, why this order)
 - [ ] Shows one example where the clarifying-question step correctly caught missing info
+- [ ] README has a `## Tradeoffs` section documenting a real decision you changed and why
 - [ ] `.env.example`; no secrets committed
 
 ## Portfolio pitch
