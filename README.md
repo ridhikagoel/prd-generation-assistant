@@ -37,8 +37,8 @@ than trusting the model to know.
    input and watching it correctly ask three real questions instead of zero.
 5. We built the draft step with a PRD structure we designed on purpose rather than copying a
    generic template, later expanded with a published field framework. See the next two points.
-6. We read Aakash Gupta's "AI PRDs" framework (news.aakashg.com/p/ai-prd) and used it to expand
-   the structure well past a basic Problem/Goals/Requirements shape: Opportunity Framing
+6. We read a published AI PRD framework and used it to expand the structure well past a basic
+   Problem/Goals/Requirements shape: Opportunity Framing
    (Problem, Working Hypothesis, Strategy Fit as three separate one line answers, not one vague
    paragraph), a Behavior Contract with GOOD/BAD/REJECT examples for features that involve real
    AI or automated judgment, Success Measurement split into an Offline Golden Set, Human Review,
@@ -174,9 +174,9 @@ Required per [CLAUDE.md](./CLAUDE.md):
    disclosed ceiling on this feature: a genuine AI feature described in unusual language could
    still be missed, and we chose a safer false negative over a fabricated false positive.
 5. **The PRD structure is intentionally heavier than a minimal one, sourced from a published
-   framework rather than invented from scratch.** Aakash Gupta's AI PRD framework
-   (news.aakashg.com/p/ai-prd) argues the difference between a mediocre PRD and a good one is not
-   length, it is decision making, and gives concrete examples of specs that read well but decide
+   framework rather than invented from scratch.** That framework argues the difference between a
+   mediocre PRD and a good one is not length, it is decision making, and gives concrete examples
+   of specs that read well but decide
    nothing ("improve engagement" is a hope, not a threshold). We adopted its structure (Behavior
    Contract, Rollout Plan, Risk Management, Ownership) over inventing our own, because it is a
    tested field framework citing a real, successful example (OpenAI's model spec) rather than a
