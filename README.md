@@ -5,8 +5,11 @@ blocking gaps (target user, success metric, scope boundary) and asks up to 3 cla
 questions only if real gaps exist, then drafts the PRD, explicitly flagging every assumption it
 had to make instead of silently inventing scope.
 
-Runs entirely on a local [Ollama](https://ollama.com) model (`llama3.2`). No API key, no
-billing. See the parent [CLAUDE.md](../CLAUDE.md) for the broader portfolio initiative.
+Runs by default on a local [Ollama](https://ollama.com) model (`llama3.2`) — no API key, no
+billing. An optional `--backend claude` routes the same pipeline through the `claude` CLI on
+an existing Claude subscription (still no API key, still no per-call billing); see Tradeoffs
+for why the backend is switchable and what the small local model gives up. See the parent
+[CLAUDE.md](../CLAUDE.md) for the broader portfolio initiative.
 
 ## Overview
 
@@ -69,22 +72,42 @@ than trusting the model to know.
 ## Setup
 
 ```
-ollama pull llama3.2
+ollama pull llama3.2               # for the default local backend
 pip install -r requirements.txt
 ```
+
+For `--backend claude` you instead need the [`claude` CLI](https://docs.claude.com/en/docs/claude-code)
+installed and signed in (subscription or API auth); the pipeline shells out to it, so nothing
+else changes.
 
 ## Usage
 
 ```
 python3 -m prd_gen.cli generate --idea "your feature idea here"
 python3 -m prd_gen.cli generate --idea-file idea.txt --output prd.md
-python3 -m prd_gen.cli generate --idea "..." --auto     # skip interactive Q&A, unanswered
-                                                          # questions become explicit assumptions
+python3 -m prd_gen.cli generate --idea "..." --auto              # skip interactive Q&A, unanswered
+                                                                  # questions become explicit assumptions
+python3 -m prd_gen.cli generate --idea "..." --backend claude    # run through the claude CLI instead
+python3 -m prd_gen.cli generate --idea "..." --backend claude --model claude-opus-4-1
 ```
 
 Interactive mode (the default) prompts for each clarifying question at the terminal before
-drafting. `--auto` is for scripted or demo runs; see the three examples below, all generated
-with it.
+drafting. `--auto` is for scripted or demo runs; see the examples below, all generated
+with it. `--backend` is `ollama` (default) or `claude`; `--model` overrides that backend's
+default (`llama3.2` / `claude-sonnet-4-5`).
+
+### Or: use it as a Claude Code skill (no setup)
+
+This repo ships an [`aiprd` skill](.claude/skills/aiprd/SKILL.md). Clone the repo, open it in
+Claude Code, and just ask — "write a PRD for \<your feature idea\>" (or run `/aiprd \<idea\>`).
+The skill runs the same method (gap check → clarify → draft), the same 12-section structure,
+and the same reasoning gates, but Claude is the model, so there's nothing to install — no
+Ollama, no Python, no API key. It asks the blocking-gap questions interactively (say "just
+draft it" to skip and get them flagged as assumptions instead), then writes `\<slug\>-prd.md`.
+
+The Python CLI above is still the standalone / scriptable version; the skill is the
+zero-friction one. The shared method lives in `prd_gen/prompts/` and the skill keeps it in
+sync.
 
 ## PRD structure
 
@@ -127,6 +150,32 @@ correctly fires this time, with 3 real GOOD examples, 2 real BAD examples, and 1
 example specific to ticket classification, plus a matched `## Guardrails` section. This example
 exists specifically to prove the Behavior Contract logic works in the "yes" direction, not just
 the easy "not applicable" direction; see Tradeoffs for why that took two attempts.
+
+## Backend comparison (same idea, `llama3.2` vs. `claude-sonnet-4-5`)
+
+Both files are real `--auto` runs of the same EdTech idea ("an app that uses AI to generate
+personalized study content and interview prep material, adapting difficulty to learner
+performance"): [examples/edtech_app.md](examples/edtech_app.md) (local `llama3.2`) and
+[examples/edtech_app_claude.md](examples/edtech_app_claude.md) (`claude` CLI, ~2.5 min end to
+end). Same pipeline, same prompts, same three-category gap check, same code-level Behavior
+Contract gate — only the model differs. What changed in the output:
+
+- **Gap check questions.** `llama3.2` asked two thin questions (target user, success metric).
+  Claude asked two questions that actually carried product weight — *which* success definition
+  (learning outcomes vs. engagement vs. interview success rate), and whether the MVP does
+  academic + interview prep together or picks one, open-ended subjects or a curated set.
+- **Assumptions.** `llama3.2` logged two vague assumptions. Claude logged four specific ones
+  (B2C not B2B2C, curated MVP subject set not open-ended, mobile-first with web undecided) and
+  said in each bullet *why* it picked that branch and what would make it wrong.
+- **Behavior Contract.** Both fired it correctly (the idea contains "generate"). `llama3.2`'s
+  examples were generic ("Physics" → "Study notes on Newton's laws"); Claude's encoded real
+  calibration rules (difficulty must not skip a level; marketing-interview prompt should not
+  produce a SQL question; regulated-domain requests get rejected).
+- **The known timing-inversion limitation does not apply here** (this idea has no "X days
+  after Y" detail to invert), so this pair isn't a test of that — it's a test of how much of
+  the output quality is the pipeline vs. the model. Answer: the pipeline enforces structure and
+  catches the same gaps either way; the model determines whether the content in that structure
+  is worth reading.
 
 ## Tradeoffs
 
@@ -196,6 +245,22 @@ Required per [CLAUDE.md](./CLAUDE.md):
    the tool is closer to the framework's advice than it first looks, but it is worth being
    explicit that a generated speclet still needs a human pass before anyone should trust it as
    final.
+
+7. **The model backend is switchable (`--backend ollama|claude`), and the pipeline logic is
+   identical across both — but the two JSON judgment calls lose `temperature=0` on the claude
+   backend.** The default is still the local `llama3.2` model, because the portfolio-wide
+   constraint is "zero cost, no API key" and a local model is the honest way to meet it. The
+   `claude` backend was added because the drafting-quality ceiling in the "Known limitation"
+   below is a small-model problem, and it should be possible to show what the same pipeline
+   produces with a stronger model without changing the constraint (the `claude` CLI runs on an
+   existing subscription — no `ANTHROPIC_API_KEY`, no per-call billing). The real cost of doing
+   it through the CLI rather than the API: the CLI exposes no temperature knob, so `check_gaps`
+   and `check_ai_behavior` — which run at `temperature=0` on Ollama specifically so the
+   judgment is deterministic — can't be pinned on the claude backend. In practice those calls
+   have a fixed JSON schema with one-line reasoning fields, which constrains them enough that
+   it hasn't caused a flipped verdict across the runs tested, but it's a genuine reason the two
+   backends are not strictly equivalent, and a reason to prefer the API over the CLI if this
+   ever needs to be reproducible run-to-run.
 
 ## Known limitation (disclosed, not fixed)
 

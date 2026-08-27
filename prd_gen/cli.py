@@ -2,14 +2,15 @@ import argparse
 import sys
 from pathlib import Path
 
-from prd_gen.pipeline import MODEL, check_gaps, draft_prd
+from prd_gen.llm import DEFAULT_MODEL
+from prd_gen.pipeline import check_gaps, draft_prd
 
 UNANSWERED = "(not answered — proceed with your best-supported assumption and flag it explicitly)"
 
 
-def run(idea: str, model: str, auto: bool, output: str | None):
-    print("--- Step 1: checking for blocking gaps ---", file=sys.stderr)
-    gaps = check_gaps(idea, model)
+def run(idea: str, model: str, backend: str, auto: bool, output: str | None):
+    print(f"--- Step 1: checking for blocking gaps ({backend}:{model}) ---", file=sys.stderr)
+    gaps = check_gaps(idea, model, backend)
 
     qa_pairs = []
     if gaps["questions"]:
@@ -29,7 +30,7 @@ def run(idea: str, model: str, auto: bool, output: str | None):
         print("No blocking gaps found — drafting directly.\n", file=sys.stderr)
 
     print("--- Step 2: drafting PRD ---", file=sys.stderr)
-    prd = draft_prd(idea, qa_pairs, model)
+    prd = draft_prd(idea, qa_pairs, model, backend)
 
     if output:
         Path(output).write_text(prd)
@@ -48,7 +49,13 @@ def main():
     src = p_gen.add_mutually_exclusive_group(required=True)
     src.add_argument("--idea", help="Feature idea as a string")
     src.add_argument("--idea-file", help="Path to a file containing the feature idea")
-    p_gen.add_argument("--model", default=MODEL)
+    p_gen.add_argument(
+        "--backend",
+        choices=["ollama", "claude"],
+        default="ollama",
+        help="ollama = local model (default); claude = the claude CLI on your existing subscription",
+    )
+    p_gen.add_argument("--model", default=None, help="Override the backend's default model")
     p_gen.add_argument("--auto", action="store_true", help="Don't prompt interactively for answers")
     p_gen.add_argument("--output", help="Write the PRD to this file instead of stdout")
 
@@ -56,7 +63,8 @@ def main():
 
     if args.command == "generate":
         idea = args.idea if args.idea else Path(args.idea_file).read_text()
-        run(idea, args.model, args.auto, args.output)
+        model = args.model or DEFAULT_MODEL[args.backend]
+        run(idea, model, args.backend, args.auto, args.output)
 
 
 if __name__ == "__main__":

@@ -3,13 +3,17 @@
 Prompt templates live in prompts/*.md as separate, readable files rather than inline strings —
 the PRD structure and the gap-check judgment are the actual product decisions this tool encodes,
 so they need to be auditable and editable without touching Python code.
+
+Backend-agnostic: every model call takes a ``backend`` ("ollama" or "claude") and a ``model``.
+See llm.py for what each backend costs (nothing, either way).
 """
 from pathlib import Path
 
-from prd_gen.llm import chat, chat_json
+from prd_gen.llm import DEFAULT_MODEL, chat, chat_json
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
-MODEL = "llama3.2"
+BACKEND = "ollama"
+MODEL = DEFAULT_MODEL[BACKEND]
 MAX_QUESTIONS = 3  # enforced in code, not just requested in the prompt — see README Tradeoffs
 
 
@@ -17,11 +21,11 @@ def _load_prompt(name: str) -> str:
     return (PROMPTS_DIR / f"{name}.md").read_text()
 
 
-def check_gaps(idea: str, model: str = MODEL) -> dict:
+def check_gaps(idea: str, model: str = MODEL, backend: str = BACKEND) -> dict:
     """Ask the model to reason per-category before verdicting, then derive sufficiency in code
     from the three *_clear booleans rather than trusting a bare top-level verdict.
 
-    A bare "respond with just {sufficient, questions}" schema turned out to make this small
+    A bare "respond with just {sufficient, questions}" schema turned out to make the small
     local model default to sufficient=true for every input regardless of content, with no
     apparent reasoning happening — see README Tradeoffs. Forcing reasoning-before-verdict per
     category fixed it; this function still doesn't trust the model to only ever populate the
@@ -30,7 +34,7 @@ def check_gaps(idea: str, model: str = MODEL) -> dict:
     whose name ends in "questions", not just the exact key asked for.
     """
     prompt = _load_prompt("gap_check").replace("{{IDEA}}", idea)
-    result = chat_json(model, prompt, temperature=0)
+    result = chat_json(model, prompt, temperature=0, backend=backend)
 
     clear_flags = [v for k, v in result.items() if k.endswith("_clear")]
     sufficient = bool(clear_flags) and all(clear_flags)
@@ -80,7 +84,7 @@ AI_BEHAVIOR_KEYWORDS = [
 ]
 
 
-def check_ai_behavior(idea: str, qa_text: str, model: str = MODEL) -> dict:
+def check_ai_behavior(idea: str, qa_text: str, model: str = MODEL, backend: str = BACKEND) -> dict:
     """Dedicated JSON-mode classification call, kept separate from drafting on purpose.
 
     The first version of this check was embedded inline in the draft prompt as a
@@ -101,7 +105,7 @@ def check_ai_behavior(idea: str, qa_text: str, model: str = MODEL) -> dict:
     for its own verdict.
     """
     prompt = _load_prompt("behavior_check").replace("{{IDEA}}", idea).replace("{{QA}}", qa_text)
-    result = chat_json(model, prompt, temperature=0)
+    result = chat_json(model, prompt, temperature=0, backend=backend)
     model_says_yes = bool(result.get("involves_ai_behavior", False))
     keyword_present = any(kw in idea.lower() for kw in AI_BEHAVIOR_KEYWORDS)
     return {
@@ -112,13 +116,18 @@ def check_ai_behavior(idea: str, qa_text: str, model: str = MODEL) -> dict:
     }
 
 
-def draft_prd(idea: str, qa_pairs: list[tuple[str, str]], model: str = MODEL) -> str:
+def draft_prd(
+    idea: str,
+    qa_pairs: list[tuple[str, str]],
+    model: str = MODEL,
+    backend: str = BACKEND,
+) -> str:
     if qa_pairs:
         qa_text = "\n".join(f"- Q: {q}\n  A: {a}" for q, a in qa_pairs)
     else:
         qa_text = "(none — the idea as given had no genuinely blocking gaps)"
 
-    behavior_check = check_ai_behavior(idea, qa_text, model)
+    behavior_check = check_ai_behavior(idea, qa_text, model, backend)
     if behavior_check["involves_ai_behavior"]:
         behavior_instruction = BEHAVIOR_CONTRACT_YES
         guardrails_instruction = GUARDRAILS_YES
@@ -133,4 +142,4 @@ def draft_prd(idea: str, qa_pairs: list[tuple[str, str]], model: str = MODEL) ->
         .replace("{{BEHAVIOR_CONTRACT_INSTRUCTION}}", behavior_instruction)
         .replace("{{GUARDRAILS_INSTRUCTION}}", guardrails_instruction)
     )
-    return chat(model, prompt, temperature=0.4)
+    return chat(model, prompt, temperature=0.4, backend=backend)
