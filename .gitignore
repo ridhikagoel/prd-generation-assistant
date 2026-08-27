@@ -8,3 +8,4 @@ venv/
 .ipynb_checkpoints/
 *.log
 data/*.snapshot.json
+RECRUITER_NOTES.md
