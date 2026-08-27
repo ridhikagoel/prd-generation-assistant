@@ -1,21 +1,33 @@
 # PRD Generation Assistant
 
-A two step CLI that turns a rough feature idea into a structured PRD: first checks for genuinely
-blocking gaps (target user, success metric, scope boundary) and asks up to 3 clarifying
-questions only if real gaps exist, then drafts the PRD, explicitly flagging every assumption it
-had to make instead of silently inventing scope.
+Turns a rough feature idea into a structured PRD: first checks for genuinely blocking gaps
+(target user, success metric, scope boundary) and asks up to 3 clarifying questions only if
+real gaps exist, then drafts the PRD, explicitly flagging every assumption it had to make
+instead of silently inventing scope.
 
-Runs by default on a local [Ollama](https://ollama.com) model (`llama3.2`) — no API key, no
-billing. An optional `--backend claude` routes the same pipeline through the `claude` CLI on
-an existing Claude subscription (still no API key, still no per-call billing); see Tradeoffs
-for why the backend is switchable and what the small local model gives up. See the parent
-[CLAUDE.md](../CLAUDE.md) for the broader portfolio initiative.
+**Two ways to run the same method:**
+
+- **As a Claude Code skill — no setup.** Clone the repo, open it in Claude Code, and ask for
+  a PRD (or run `/aiprd <idea>`). Claude is the model, so there's nothing to install — no
+  Ollama, no Python, no API key. This is the zero-friction path; see
+  [As a Claude Code skill](#as-a-claude-code-skill-no-setup).
+- **As a Python CLI — scriptable / standalone.** Runs by default on a local
+  [Ollama](https://ollama.com) model (`llama3.2`) — no API key, no billing. An optional
+  `--backend claude` routes the same pipeline through the `claude` CLI on an existing Claude
+  subscription (still no API key, still no per-call billing); see Tradeoffs for why the backend
+  is switchable and what the small local model gives up.
+
+The gap check → clarify → draft method, the 12-section PRD structure, and the reasoning gates
+are identical across both — the shared prompt logic lives in `prd_gen/prompts/` and the skill
+keeps it in sync. See the parent [CLAUDE.md](../CLAUDE.md) for the broader portfolio initiative.
 
 ## Overview
 
 This project turns "just ask an AI to write a PRD" into something closer to what a PM actually
 needs: a tool that knows what a PRD requires to be complete, and says so before it starts
-drafting.
+drafting. The method ships both as a Python CLI (local Ollama by default, or through the
+`claude` CLI) and as a zero-setup [`aiprd` Claude Code skill](.claude/skills/aiprd/SKILL.md) —
+same gap check, same structure, same reasoning gates.
 
 **The problem it solves.** Anyone can prompt an LLM into producing a confident looking PRD. The
 failure mode is that it fills gaps silently, so the output reads as complete even when it is
@@ -71,6 +83,10 @@ than trusting the model to know.
 
 ## Setup
 
+**Claude Code skill:** nothing to install. Clone the repo and open it in Claude Code.
+
+**Python CLI:**
+
 ```
 ollama pull llama3.2               # for the default local backend
 pip install -r requirements.txt
@@ -81,6 +97,19 @@ installed and signed in (subscription or API auth); the pipeline shells out to i
 else changes.
 
 ## Usage
+
+### As a Claude Code skill (no setup)
+
+This repo ships an [`aiprd` skill](.claude/skills/aiprd/SKILL.md). Clone the repo, open it in
+Claude Code, and just ask — "write a PRD for \<your feature idea\>" (or run `/aiprd \<idea\>`).
+Claude is the model, so there's nothing to install — no Ollama, no Python, no API key. It runs
+the same method (gap check → clarify → draft), the same 12-section structure, and the same
+reasoning gates. It asks the blocking-gap questions interactively (say "just draft it" to skip
+and get them flagged as assumptions instead), then writes `\<slug\>-prd.md`.
+
+This is the zero-friction path. The Python CLI below is the standalone / scriptable version.
+
+### As a Python CLI (local Ollama, or through the `claude` CLI)
 
 ```
 python3 -m prd_gen.cli generate --idea "your feature idea here"
@@ -96,18 +125,8 @@ drafting. `--auto` is for scripted or demo runs; see the examples below, all gen
 with it. `--backend` is `ollama` (default) or `claude`; `--model` overrides that backend's
 default (`llama3.2` / `claude-sonnet-4-5`).
 
-### Or: use it as a Claude Code skill (no setup)
-
-This repo ships an [`aiprd` skill](.claude/skills/aiprd/SKILL.md). Clone the repo, open it in
-Claude Code, and just ask — "write a PRD for \<your feature idea\>" (or run `/aiprd \<idea\>`).
-The skill runs the same method (gap check → clarify → draft), the same 12-section structure,
-and the same reasoning gates, but Claude is the model, so there's nothing to install — no
-Ollama, no Python, no API key. It asks the blocking-gap questions interactively (say "just
-draft it" to skip and get them flagged as assumptions instead), then writes `\<slug\>-prd.md`.
-
-The Python CLI above is still the standalone / scriptable version; the skill is the
-zero-friction one. The shared method lives in `prd_gen/prompts/` and the skill keeps it in
-sync.
+The shared method lives in `prd_gen/prompts/`; the skill keeps it in sync so all three run
+paths (skill, local Ollama, `claude` CLI) produce the same structure.
 
 ## PRD structure
 
